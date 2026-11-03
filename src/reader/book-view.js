@@ -6,9 +6,16 @@ import { getLayout, saveLayout } from '../storage.js';
 
 const GAP = 40; // jarak antar kolom (px), harus sama saat mengukur & menampilkan
 const LAYOUT_VERSION = 1; // naikkan bila cara paginasi berubah (membuang cache lama)
-const RENDER_BEHIND = 4;
+const RENDER_NOW = 2; // halaman di sekitar posisi baca yang langsung diisi (dibutuhkan animasi)
+const RENDER_BEHIND = 4; // sisanya disiapkan saat browser senggang
 const RENDER_AHEAD = 6;
 const KEEP_RENDERED = 14;
+
+// Jalankan pekerjaan saat browser senggang (Safari belum punya requestIdleCallback)
+const whenIdle = window.requestIdleCallback
+  ? (fn) => window.requestIdleCallback(fn, { timeout: 1500 })
+  : (fn) => setTimeout(() => fn(null), 150);
+const cancelIdle = window.cancelIdleCallback || clearTimeout;
 
 export const FONT_STACKS = {
   serif: 'Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif',
@@ -212,7 +219,7 @@ export class BookView {
       startPage: start,
       drawShadow: true,
       maxShadowOpacity: 0.5,
-      flippingTime: 700,
+      flippingTime: 600,
       mobileScrollSupport: false,
       swipeDistance: 20,
       showPageCorners: true,
@@ -308,9 +315,35 @@ export class BookView {
   }
 
   renderWindow(index) {
-    const from = Math.max(0, index - RENDER_BEHIND);
-    const to = Math.min(this.total - 1, index + RENDER_AHEAD);
-    for (let i = from; i <= to; i++) this.renderPage(i);
+    // 1) halaman yang terlihat & yang akan terbuka saat dibalik: isi sekarang juga
+    const clamp = (i) => Math.min(this.total - 1, Math.max(0, i));
+    for (let i = clamp(index - RENDER_NOW); i <= clamp(index + RENDER_NOW + 1); i++) this.renderPage(i);
+
+    // 2) sisanya satu per satu saat browser senggang, agar animasi berikutnya tidak tersendat
+    // (yang langsung diisi: index-RENDER_NOW .. index+RENDER_NOW+1)
+    const queue = [];
+    for (let d = RENDER_NOW + 1; d <= Math.max(RENDER_AHEAD, RENDER_BEHIND); d++) {
+      if (d >= RENDER_NOW + 2 && d <= RENDER_AHEAD && index + d < this.total) queue.push(index + d);
+      if (d <= RENDER_BEHIND && index - d >= 0) queue.push(index - d);
+    }
+    cancelIdle(this.idleHandle);
+    const step = (deadline) => {
+      if (!this.flip) return;
+      if (this.flip.getState() !== 'read') {
+        this.idleHandle = whenIdle(step); // sedang membalik halaman: tunda
+        return;
+      }
+      do {
+        const i = queue.shift();
+        if (i !== undefined) this.renderPage(i);
+      } while (queue.length && deadline && deadline.timeRemaining() > 8);
+      if (queue.length) this.idleHandle = whenIdle(step);
+      else this.unrenderFar(index);
+    };
+    this.idleHandle = whenIdle(step);
+  }
+
+  unrenderFar(index) {
     for (const i of [...this.rendered]) {
       if (i < index - KEEP_RENDERED || i > index + KEEP_RENDERED) {
         this.pages[i].querySelector('.page-content').shadowRoot.innerHTML = '';
@@ -346,6 +379,7 @@ export class BookView {
   }
 
   destroyFlip() {
+    cancelIdle(this.idleHandle);
     if (this.flip) {
       this.flip.destroy(); // juga menghapus elemen buku
       this.flip = null;

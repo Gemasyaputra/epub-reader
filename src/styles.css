@@ -81,8 +81,7 @@ button { font: inherit; color: inherit; }
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: var(--bg); /* tanpa backdrop-filter: efek blur membuat scroll di HP patah-patah */
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; font: 700 1.25rem var(--font-serif); }
@@ -210,13 +209,17 @@ button { font: inherit; color: inherit; }
 }
 
 /* buku & halaman */
-.book { flex: none; filter: drop-shadow(0 10px 28px rgba(30, 20, 10, 0.28)); }
-.reader[data-theme='dark'] .book { filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.6)); }
+/* Bayangan buku memakai box-shadow, bukan filter: drop-shadow pada induk memaksa
+   seluruh buku digambar ulang di setiap frame animasi (patah-patah di HP). */
+.book { flex: none; }
+.book .stf__block { box-shadow: 0 10px 28px rgba(30, 20, 10, 0.28); }
+.reader[data-theme='dark'] .book .stf__block { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6); }
 
 .page { background: var(--paper); color: var(--page-text); overflow: hidden; }
 .page-content {
   position: absolute; left: var(--pad-x); top: var(--pad-top);
   width: var(--inner-w); height: var(--inner-h);
+  contain: strict; /* isi halaman terisolasi: tidak memicu hitung ulang tata letak di luarnya */
 }
 .page--fxl .page-content { left: 0; top: 0; width: 100%; height: 100%; }
 .page-number {
@@ -271,7 +274,7 @@ button { font: inherit; color: inherit; }
 .sheet .panel-head { padding: 12px 0 4px; }
 .panel-head h2 { margin: 0; font: 700 1.1rem var(--font-serif); }
 
-.toc-list { list-style: none; margin: 0; padding: 4px 8px 24px; overflow-y: auto; }
+.toc-list { list-style: none; margin: 0; padding: 4px 8px 24px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .toc-list button {
   width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
   padding: 10px 12px 10px calc(12px + var(--level, 0) * 16px); border-radius: 10px; line-height: 1.35;

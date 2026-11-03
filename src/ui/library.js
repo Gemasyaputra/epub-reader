@@ -101,7 +101,7 @@ export async function renderLibrary(app) {
     if (book.cover) {
       const url = URL.createObjectURL(book.cover);
       coverUrls.push(url);
-      cover = `<img src="${url}" alt="" loading="lazy">`;
+      cover = `<img src="${url}" alt="" loading="lazy" decoding="async">`;
     } else {
       cover = `<div class="cover-placeholder" style="--cover:${coverColor(book.title)}"><span>${esc(book.title)}</span></div>`;
     }
