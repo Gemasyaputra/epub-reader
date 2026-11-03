@@ -152,7 +152,10 @@ export class SimpleFlip {
     const incoming = this.spread(target);
     const finish = () => {
       outgoing.forEach((p) => this.resetPage(p, true));
-      incoming.forEach((p) => this.resetPage(p));
+      incoming.forEach((p) => {
+        this.resetPage(p);
+        p.style.display = 'block'; // mode "Tanpa" melewati animasi: tampilkan di sini
+      });
       this.stopAnimations();
       this.current = target;
       this.setState('read');
@@ -212,6 +215,9 @@ export class SimpleFlip {
 
     const onDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // cegah seleksi teks / drag bawaan browser: keduanya memicu pointercancel dan
+      // membatalkan geseran halaman dengan mouse
+      if (e.pointerType === 'mouse') e.preventDefault();
       try {
         el.setPointerCapture(e.pointerId); // gerakan tetap terbaca walau jari keluar dari buku
       } catch {
@@ -289,6 +295,7 @@ export class SimpleFlip {
       }
     };
 
+    el.addEventListener('dragstart', (e) => e.preventDefault()); // gambar di halaman jangan ikut terseret
     el.addEventListener('pointerdown', onDown);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
