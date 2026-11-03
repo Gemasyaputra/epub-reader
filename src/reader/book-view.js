@@ -3,6 +3,7 @@
 // yang diisi konten, agar buku ratusan halaman tetap ringan.
 import { PageFlip } from 'page-flip';
 import { getLayout, saveLayout } from '../storage.js';
+import { attachTouch } from './touch.js';
 
 const GAP = 40; // jarak antar kolom (px), harus sama saat mengukur & menampilkan
 const LAYOUT_VERSION = 1; // naikkan bila cara paginasi berubah (membuang cache lama)
@@ -227,6 +228,7 @@ export class BookView {
       useMouseEvents: true,
     });
     this.flip.loadFromHTML(this.pages);
+    this.detachTouch = attachTouch(this.stage, () => this.flip, L);
     this.flip.on('flip', (e) => {
       this.anchor = this.positionAt(e.data);
       this.renderWindow(e.data);
@@ -380,6 +382,8 @@ export class BookView {
 
   destroyFlip() {
     cancelIdle(this.idleHandle);
+    this.detachTouch?.();
+    this.detachTouch = null;
     if (this.flip) {
       this.flip.destroy(); // juga menghapus elemen buku
       this.flip = null;
