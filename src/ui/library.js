@@ -114,7 +114,7 @@ export async function renderLibrary(app) {
             <div class="book-title">${esc(book.title)}</div>
             <div class="book-author">${esc(book.author || 'Penulis tidak diketahui')}</div>
             <div class="progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
-            <div class="book-meta">${status}</div>
+            <div class="book-meta">${status}${book.music ? ' · <span title="Ada musik pengiring">♪ musik</span>' : ''}</div>
           </div>
         </a>
         <button type="button" class="book-delete" data-id="${esc(book.id)}" aria-label="Hapus ${esc(book.title)}" title="Hapus dari rak">${ICONS.trash}</button>

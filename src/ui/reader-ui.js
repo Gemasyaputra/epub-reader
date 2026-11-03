@@ -4,6 +4,7 @@ import { EpubBook } from '../epub/parser.js';
 import { loadChapter } from '../epub/content.js';
 import { BookView } from '../reader/book-view.js';
 import { ICONS, esc } from './dom.js';
+import { setupMusic } from './music-ui.js';
 import { toast } from './toast.js';
 
 const LAYOUT_KEYS = ['fontSize', 'font', 'lineHeight'];
@@ -23,6 +24,7 @@ function template(meta, settings) {
         <div class="reader-book">${esc(meta.title)}</div>
         <div class="reader-chapter" id="chapter-title"></div>
       </div>
+      <button type="button" class="icon-btn music-btn" id="music-btn" aria-label="Musik pengiring">${ICONS.music}</button>
       <button type="button" class="icon-btn" id="toc-btn" aria-label="Daftar isi">${ICONS.list}</button>
       <button type="button" class="icon-btn" id="settings-btn" aria-label="Pengaturan tampilan">${ICONS.type}</button>
     </header>
@@ -65,6 +67,16 @@ function template(meta, settings) {
       <div class="setting"><span>Tampilan halaman</span>${segmented('spread', [['auto', 'Otomatis'], ['single', '1 halaman'], ['double', '2 halaman']])}</div>
       <div class="setting"><span>Tema</span>${segmented('theme', [['light', 'Terang'], ['sepia', 'Sepia'], ['dark', 'Gelap']])}</div>
     </section>
+
+    <section class="sheet" id="music-panel" aria-label="Musik pengiring" hidden></section>
+
+    <div class="music-player collapsed" id="music-player" hidden>
+      <div class="music-bar">
+        <button type="button" class="music-toggle" id="music-toggle" aria-expanded="false">${ICONS.musicSmall}<span id="music-title">Musik</span></button>
+        <button type="button" class="icon-btn music-close" id="music-close" aria-label="Hentikan musik">${ICONS.closeSmall}</button>
+      </div>
+      <div class="music-frame" id="music-frame"></div>
+    </div>
   </div>`;
 }
 
@@ -197,7 +209,7 @@ export async function openReader(app, id) {
 
   // ---- panel
   const scrim = $('#scrim');
-  const panels = { toc: $('#toc-panel'), settings: $('#settings-panel') };
+  const panels = { toc: $('#toc-panel'), settings: $('#settings-panel'), music: $('#music-panel') };
   const openPanel = (name) => {
     Object.entries(panels).forEach(([key, el]) => (el.hidden = key !== name));
     scrim.hidden = false;
@@ -233,6 +245,13 @@ export async function openReader(app, id) {
     }
   };
 
+  const music = setupMusic({ root, bookId: id, initialUrl: meta.music?.url, closePanels });
+  disposers.push(() => music.dispose());
+  listen($('#music-btn'), 'click', () => {
+    music.renderPanel();
+    openPanel('music');
+    if (!meta.music && matchMedia('(hover: hover)').matches) music.focusInput(); // di HP jangan munculkan keyboard otomatis
+  });
   listen($('#toc-btn'), 'click', () => openPanel('toc'));
   listen($('#settings-btn'), 'click', () => openPanel('settings'));
   listen(scrim, 'click', closePanels);

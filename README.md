@@ -10,6 +10,7 @@ Aplikasi web untuk membaca buku EPUB dengan **animasi membalik halaman** (lipata
   - Daftar isi, judul bab di toolbar, nomor halaman.
   - Pengaturan: ukuran huruf, jenis huruf (bawaan buku/serif/sans), jarak baris, tema terang/sepia/gelap.
   - Posisi baca disimpan otomatis dan tetap tepat walau ukuran huruf/layar berubah.
+- **Musik pengiring per buku**: tempel link lagu/album/playlist **YouTube** atau **Spotify** lewat tombol ♪ saat membaca; diputar di pemutar mini yang tetap jalan saat halaman dibalik (bisa dikecilkan). Butuh internet; Spotify memutar lagu penuh bila sudah login Spotify di browser (tanpa login hanya cuplikan 30 detik).
 - **EPUB fixed-layout** (mis. hasil "mode Gambar" dari konverter PDF→EPUB) tampil per halaman, pas dengan layar.
 - **PWA**: tombol Install, offline penuh, notifikasi versi baru; di Chrome desktop file `.epub` bisa dibuka langsung dengan "Buka dengan Lembar".
 

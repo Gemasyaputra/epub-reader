@@ -303,6 +303,59 @@ button { font: inherit; color: inherit; }
 }
 .stepper button:hover, .segmented button:hover:not([aria-pressed='true']) { background: color-mix(in srgb, var(--chrome-text) 7%, transparent); }
 
+/* ---------- musik pengiring ---------- */
+.music-btn { position: relative; }
+.music-btn.has-music { color: var(--page-link); }
+.music-btn.has-music::after { /* titik penanda: buku ini punya musik */
+  content: ''; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--page-link);
+}
+
+.music-help, .music-note { margin: 4px 0 12px; color: var(--chrome-muted); font-size: 0.9rem; line-height: 1.45; }
+.music-help strong { color: var(--chrome-text); }
+.music-note { font-size: 0.8rem; margin: 14px 0 0; }
+.music-form { display: flex; gap: 8px; }
+.music-form input {
+  flex: 1; min-width: 0; height: 42px; padding: 0 12px;
+  border: 1px solid var(--chrome-border); border-radius: 10px;
+  background: var(--paper); color: var(--chrome-text); font: inherit; font-size: 0.92rem;
+}
+.music-form input:focus { outline: 2px solid var(--page-link); outline-offset: 0; border-color: transparent; }
+.music-form .btn { background: var(--page-link); color: var(--paper); }
+.music-error { margin: 8px 0 0; color: #c0392b; font-size: 0.85rem; }
+.reader[data-theme='dark'] .music-error { color: #f0857a; }
+.music-current {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--chrome-border); font-size: 0.9rem;
+}
+.music-current .btn { color: var(--chrome-text); border-color: var(--chrome-border); }
+
+.music-player {
+  position: fixed; z-index: 15;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  width: min(360px, calc(100vw - 24px));
+  background: var(--chrome); color: var(--chrome-text);
+  border: 1px solid var(--chrome-border); border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22); overflow: hidden;
+}
+.music-player.collapsed { width: auto; max-width: min(360px, calc(100vw - 24px)); border-radius: 999px; }
+.music-bar { display: flex; align-items: center; gap: 2px; padding: 3px 3px 3px 12px; }
+.music-toggle {
+  flex: 1; min-width: 0; min-height: 36px; display: flex; align-items: center; gap: 8px;
+  border: 0; background: transparent; cursor: pointer; text-align: left;
+  font-size: 0.85rem; font-weight: 600; color: inherit;
+}
+.music-toggle span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-player.playing .music-toggle svg { color: var(--page-link); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.45; } }
+.music-close { width: 34px; height: 34px; }
+.music-player:not(.playing) .music-close { display: none; }
+/* diperkecil: iframe tetap ada (musik tetap jalan), hanya tidak terlihat */
+.music-player.collapsed .music-frame { height: 0; overflow: hidden; }
+.music-frame iframe { display: block; width: 100%; border: 0; }
+@media (prefers-reduced-motion: reduce) { .music-player.playing .music-toggle svg { animation: none; } }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; z-index: 100; left: 50%; transform: translateX(-50%);
