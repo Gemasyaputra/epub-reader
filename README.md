@@ -1,11 +1,13 @@
-# Lembar — Pembaca EPUB
+# Lembar — Pembaca EPUB & PDF
 
-Aplikasi web untuk membaca buku EPUB dengan **animasi membalik halaman** (lipatan kertas realistis), bisa di-install seperti aplikasi (PWA) dan dipakai **tanpa internet**.
+Aplikasi web untuk membaca buku EPUB & PDF dengan **animasi membalik halaman** (lipatan kertas realistis), bisa di-install seperti aplikasi (PWA) dan dipakai **tanpa internet**.
 
 ## Fitur
 
-- **Rak buku**: tambah file `.epub` (tombol atau seret file ke halaman), sampul otomatis, progres baca, hapus buku.
-- **Membaca**: halaman melengkung saat di-drag dari sudut, klik/tap sisi halaman, swipe, tombol panah keyboard, atau slider.
+- **Rak buku**: tambah file `.epub` atau `.pdf` (tombol atau seret file ke halaman), sampul otomatis, progres baca, hapus buku.
+- **Membaca**: halaman melengkung saat di-drag dari sudut, klik/tap sisi halaman (kiri 30% mundur, kanan 30% maju), swipe, tombol panah keyboard, atau slider.
+  - **Ketuk/klik tengah layar** (atau tombol `M`) untuk menyembunyikan/menampilkan menu atas & bawah — bacaan memenuhi layar.
+  - Tombol **layar penuh** di menu atas (browser yang mendukung Fullscreen API).
   - **Mode baca**: **Buku** (default, halaman dibalik) atau **Gulir** (teks mengalir ke bawah, dibaca dengan scroll; buku komik/fixed-layout tampil bertumpuk seperti webtoon).
   - **Animasi halaman** di mode buku: **Lipat kertas** (default), **Geser**, **Pudar**, atau **Tanpa** — tiga terakhir jauh lebih ringan untuk HP.
   - Tampilan halaman bisa dipilih: **Otomatis** (2 halaman di layar lebar/landscape, 1 halaman di HP portrait), **1 halaman**, atau **2 halaman**.
@@ -13,14 +15,15 @@ Aplikasi web untuk membaca buku EPUB dengan **animasi membalik halaman** (lipata
   - Pengaturan: ukuran huruf, jenis huruf (bawaan buku/serif/sans), jarak baris, tema terang/sepia/gelap.
   - Posisi baca disimpan otomatis dan tetap tepat walau ukuran huruf/layar berubah.
 - **Musik pengiring per buku**: tempel link lagu/album/playlist **YouTube** atau **Spotify** lewat tombol ♪ saat membaca; diputar di pemutar mini yang tetap jalan saat halaman dibalik (bisa dikecilkan). Butuh internet; Spotify memutar lagu penuh bila sudah login Spotify di browser (tanpa login hanya cuplikan 30 detik).
+- **PDF**: tiap halaman PDF tampil apa adanya (digambar dengan pdf.js sesuai resolusi layar), daftar isi dari bookmark PDF, bisa mode buku maupun gulir. Untuk PDF teks yang ingin bisa diperbesar hurufnya, ubah dulu ke EPUB dengan konverter.
 - **EPUB fixed-layout** (mis. hasil "mode Gambar" dari konverter PDF→EPUB) tampil per halaman, pas dengan layar.
-- **PWA**: tombol Install, offline penuh, notifikasi versi baru; di Chrome desktop file `.epub` bisa dibuka langsung dengan "Buka dengan Lembar".
+- **PWA**: layar penuh saat di-install (status & navigation bar HP disembunyikan), tombol Install, offline penuh (termasuk membuka PDF), notifikasi versi baru; di Chrome desktop file `.epub`/`.pdf` bisa dibuka langsung dengan "Buka dengan Lembar".
 
 Semua buku disimpan di **browser perangkat itu sendiri** (IndexedDB). Tidak ada server, login, atau database — buku tidak dikirim ke mana pun.
 
 ## Menjalankan di komputer
 
-Butuh Node.js 18+.
+Butuh Node.js 20.19+ atau 22+ (syarat Vite 8).
 
 ```bash
 npm install
@@ -64,5 +67,6 @@ Untuk **sinkron progres/bookmark antar perangkat** perlu login + backend: metada
 ## Lisensi pihak ketiga
 
 - [StPageFlip / page-flip](https://github.com/Nodlik/StPageFlip) — MIT
+- [pdf.js / pdfjs-dist](https://github.com/mozilla/pdf.js) — Apache-2.0
 - [JSZip](https://stuk.github.io/jszip/) — MIT / GPLv3
 - [idb](https://github.com/jakearchibald/idb) — ISC

@@ -13,8 +13,9 @@ const FLICK_SPEED = 0.35; // px/ms
 const QUEUE_LIMIT_MS = 4000;
 
 export class SimpleFlip {
-  constructor(el, { pageW, pageH, landscape, startPage, mode }) {
+  constructor(el, { pageW, pageH, landscape, startPage, mode, onCenterTap }) {
     this.el = el;
+    this.onCenterTap = onCenterTap;
     this.pageW = pageW;
     this.pageH = pageH;
     this.landscape = landscape;
@@ -271,11 +272,12 @@ export class SimpleFlip {
       const dy = e.clientY - g.y0;
 
       if (!g.dir) {
-        // tap / klik: sisi kiri = mundur, sisi kanan = maju
+        // tap / klik: kiri 30% = mundur, kanan 30% = maju, tengah = tampil/sembunyikan menu
         if (e.type === 'pointerup' && Math.hypot(dx, dy) <= TAP_MOVE && e.timeStamp - g.t0 <= TAP_TIME) {
-          const x = e.clientX - g.rect.left;
-          const prevZone = this.landscape ? g.rect.width / 2 : g.rect.width * 0.35;
-          this.go(x < prevZone ? -1 : 1);
+          const x = (e.clientX - g.rect.left) / g.rect.width;
+          if (x < 0.3) this.go(-1);
+          else if (x > 0.7) this.go(1);
+          else this.onCenterTap?.();
         }
         return;
       }

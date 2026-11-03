@@ -20,7 +20,7 @@ const QUEUE_LIMIT_MS = 4000; // swipe saat animasi masih berjalan ditunda paling
  * Pasang gestur sentuh pada `stage`. Return fungsi untuk melepasnya.
  * `layout` = hasil computeLayout(): pageW, pageH, landscape.
  */
-export function attachTouch(stage, getFlip, layout) {
+export function attachTouch(stage, getFlip, layout, { onCenterTap } = {}) {
   const pw = layout.pageW;
   // Koordinat relatif elemen buku. Punggung buku: tepi kiri halaman (1 halaman) / tengah (2 halaman).
   // StPageFlip menganggap halaman jadi dibalik bila titik lipatan melewati punggung buku.
@@ -141,11 +141,12 @@ export function attachTouch(stage, getFlip, layout) {
     const y = t.clientY - g.rect.top;
 
     if (!g.dir) {
-      // tap: sisi kiri = mundur, sisi kanan = maju
+      // tap: kiri 30% = mundur, kanan 30% = maju, tengah = tampil/sembunyikan menu
       if (e.type === 'touchend' && Math.hypot(dx, dy) <= TAP_MOVE && e.timeStamp - g.t0 <= TAP_TIME) {
-        const x = t.clientX - g.rect.left;
-        const prevZone = layout.landscape ? g.rect.width / 2 : g.rect.width * 0.35;
-        flipTo(x < prevZone ? 'prev' : 'next', y);
+        const x = (t.clientX - g.rect.left) / g.rect.width;
+        if (x < 0.3) flipTo('prev', y);
+        else if (x > 0.7) flipTo('next', y);
+        else onCenterTap?.();
       }
       return;
     }

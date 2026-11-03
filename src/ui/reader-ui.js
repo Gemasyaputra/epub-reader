@@ -2,6 +2,7 @@
 import { getBook, getBookFile, loadSettings, saveSettings, updateBook } from '../storage.js';
 import { EpubBook } from '../epub/parser.js';
 import { loadChapter } from '../epub/content.js';
+import { isPdfFile, openPdf } from '../pdf/pdf-book.js';
 import { BookView } from '../reader/book-view.js';
 import { ScrollView } from '../reader/scroll-view.js';
 import { ICONS, esc } from './dom.js';
@@ -28,6 +29,7 @@ function template(meta, settings) {
       <button type="button" class="icon-btn music-btn" id="music-btn" aria-label="Musik pengiring">${ICONS.music}</button>
       <button type="button" class="icon-btn" id="toc-btn" aria-label="Daftar isi">${ICONS.list}</button>
       <button type="button" class="icon-btn" id="settings-btn" aria-label="Pengaturan tampilan">${ICONS.type}</button>
+      <button type="button" class="icon-btn fullscreen-btn" id="fullscreen-btn" aria-label="Layar penuh" hidden>${ICONS.expand}${ICONS.collapse}</button>
     </header>
 
     <div class="stage-wrap">
@@ -128,24 +130,33 @@ export async function openReader(app, id) {
     view?.destroy();
     book?.close();
     fontFaceStyle.remove();
-    document.body.classList.remove('reading');
+    document.body.classList.remove('reading', 'reader-ui-hidden');
   };
 
-  // ---- muat buku
+  // ---- muat buku (EPUB atau PDF)
   let chapters;
   let tocItems = [];
   try {
     const file = await getBookFile(id);
     if (!file) throw new Error('file buku tidak ditemukan');
-    book = await EpubBook.open(file);
-    const fontFaces = new Set();
-    chapters = [];
-    for (const [i, item] of book.spine.entries()) {
+    if (meta.format === 'pdf' || isPdfFile(file)) {
+      book = await openPdf(file, {
+        fileName: meta.fileName,
+        onProgress: (p) => setLoading('Membuka PDF…', p * 0.5),
+      });
       if (disposed) return cleanup;
-      chapters.push(await loadChapter(book, item, fontFaces));
-      setLoading('Membuka buku…', ((i + 1) / book.spine.length) * 0.5);
+      chapters = book.chapters;
+    } else {
+      book = await EpubBook.open(file);
+      const fontFaces = new Set();
+      chapters = [];
+      for (const [i, item] of book.spine.entries()) {
+        if (disposed) return cleanup;
+        chapters.push(await loadChapter(book, item, fontFaces));
+        setLoading('Membuka buku…', ((i + 1) / book.spine.length) * 0.5);
+      }
+      fontFaceStyle.textContent = [...fontFaces].join('\n');
     }
-    fontFaceStyle.textContent = [...fontFaces].join('\n');
     tocItems = book.toc;
   } catch (err) {
     setLoading(`Buku tidak bisa dibuka: ${err.message}.`, 0);
@@ -191,10 +202,23 @@ export async function openReader(app, id) {
     saveTimer = setTimeout(() => savePosition(state), 400);
   }
 
+  // ---- menu atas & bawah: ketuk tengah layar untuk menampilkan/menyembunyikan.
+  // Menu melayang di atas panggung, jadi menyembunyikannya tidak mengubah ukuran halaman.
+  const setUiHidden = (hidden) => {
+    root.classList.toggle('ui-hidden', hidden);
+    document.body.classList.toggle('reader-ui-hidden', hidden);
+  };
+  const toggleUi = () => {
+    if (!$('#scrim').hidden) return; // ada panel terbuka
+    setUiHidden(!root.classList.contains('ui-hidden'));
+  };
+
   const isScroll = () => settings.flow === 'scroll';
   const makeView = () => {
     const View = isScroll() ? ScrollView : BookView;
-    return new View({ stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange });
+    return new View({
+      stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange, onCenterTap: toggleUi,
+    });
   };
   root.classList.toggle('flow-scroll', isScroll());
   view = makeView();
@@ -314,6 +338,7 @@ export async function openReader(app, id) {
   listen(window, 'keydown', (e) => {
     if (e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape') closePanels();
+    else if (e.key === 'm' || e.key === 'M') toggleUi();
     else if (['ArrowRight', 'PageDown', ' '].includes(e.key)) {
       e.preventDefault();
       view.next();
@@ -343,7 +368,33 @@ export async function openReader(app, id) {
   observer.observe(stage);
   disposers.push(() => observer.disconnect());
 
+  // ---- layar penuh (browser biasa; PWA terpasang sudah fullscreen lewat manifest)
+  const fullscreenBtn = $('#fullscreen-btn');
+  const syncFullscreen = () => {
+    const active = Boolean(document.fullscreenElement);
+    fullscreenBtn.classList.toggle('active', active);
+    fullscreenBtn.setAttribute('aria-label', active ? 'Keluar dari layar penuh' : 'Layar penuh');
+  };
+  fullscreenBtn.hidden = !document.fullscreenEnabled || matchMedia('(display-mode: fullscreen)').matches;
+  listen(fullscreenBtn, 'click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => toast('Layar penuh tidak didukung di browser ini.'));
+  });
+  listen(document, 'fullscreenchange', syncFullscreen);
+  disposers.push(() => document.fullscreenElement && document.exitFullscreen().catch(() => {}));
+  syncFullscreen();
+
   syncSettingsUI();
   await rebuild('Menyusun halaman…');
+
+  // petunjuk sekali saja
+  try {
+    if (!disposed && !localStorage.getItem('lembar.hint.tap')) {
+      localStorage.setItem('lembar.hint.tap', '1');
+      toast('Ketuk tengah layar untuk menyembunyikan atau menampilkan menu.', { duration: 6000 });
+    }
+  } catch {
+    /* storage diblokir */
+  }
   return cleanup;
 }

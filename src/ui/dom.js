@@ -11,6 +11,8 @@ export const ICONS = {
   list: svg('<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
   type: svg('<path d="M4 19l5-14 5 14M5.8 14h6.4"/><path d="M15 19l3.2-8.5L21.4 19M16 16.5h4.4"/>'),
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  expand: svg('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>').replace('<svg', '<svg class="icon-expand"'),
+  collapse: svg('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>').replace('<svg', '<svg class="icon-collapse"'),
   closeSmall: svg('<path d="M7 7l10 10M17 7L7 17"/>', 16),
   music: svg('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'),
   musicSmall: svg('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>', 16),

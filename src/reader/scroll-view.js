@@ -19,8 +19,9 @@ ${textCss(settings, '80vh')}`;
 }
 
 export class ScrollView {
-  constructor({ stage, fixedLayout, chapters, settings, onChange }) {
+  constructor({ stage, fixedLayout, chapters, settings, onChange, onCenterTap }) {
     this.stage = stage;
+    this.onCenterTap = onCenterTap; // ketuk tanpa menggulir: tampil/sembunyikan menu
     this.fixedLayout = fixedLayout;
     this.chapters = chapters;
     this.settings = settings;
@@ -78,10 +79,26 @@ export class ScrollView {
     };
     scroller.addEventListener('scroll', this.onScroll, { passive: true });
 
+    // ketuk/klik tanpa menggulir -> tampil/sembunyikan menu (bukan bila mengetuk tautan)
+    let press = null;
+    scroller.addEventListener('pointerdown', (e) => {
+      press = { x: e.clientX, y: e.clientY, t: e.timeStamp, top: scroller.scrollTop };
+    });
+    scroller.addEventListener('pointercancel', () => (press = null)); // jari mulai menggulir
+    scroller.addEventListener('pointerup', (e) => {
+      const p = press;
+      press = null;
+      if (!p || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10 || e.timeStamp - p.t > 350) return;
+      if (Math.abs(scroller.scrollTop - p.top) > 2) return;
+      if (e.composedPath().some((n) => n.tagName === 'A' || n.dataset?.chapter)) return;
+      this.onCenterTap?.();
+    });
+
     const start = this.clampChapter(position?.chapter ?? 0);
     const near = [start - 1, start, start + 1].filter((i) => i >= 0 && i < this.sections.length);
     near.forEach((i) => this.render(i));
     // tunggu gambar di bab sekitar termuat dulu, agar posisi awal dihitung dari tinggi sebenarnya
+    // (halaman PDF tingginya sudah pasti dari ukuran halaman, jadi tidak perlu ditunggu)
     await Promise.all(near.map((i) => settle(this.sections[i].shadowRoot, 1500)));
     if (!this.scroller) return; // sudah dihancurkan selagi menunggu
     this.scrollToPosition({ chapter: start, frac: position?.frac || 0 });
@@ -127,6 +144,7 @@ export class ScrollView {
 .fxl-frame { position: absolute; left: 0; top: 0; width: ${vw}px; height: ${vh}px; transform: scale(${this.width / vw}); transform-origin: 0 0; }
 .fxl-frame .epub-body { position: relative; margin: 0; width: ${vw}px; height: ${vh}px; }
 ${chapter.css}</style><div class="fxl-frame"><div class="epub-body ${cls}">${chapter.html}</div></div>`;
+      chapter.renderInto?.(root.querySelector('canvas.pdf-page'), this.width); // halaman PDF
     } else {
       root.innerHTML = `<style>${this.css.base}${chapter.css}${this.css.text}</style>`
         + `<div class="epub-body ${cls}">${chapter.html}</div>`;

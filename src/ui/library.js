@@ -1,6 +1,7 @@
 // Rak buku: daftar buku tersimpan, tambah (pilih / seret file), hapus.
 import { addBook, deleteBook, listBooks, requestPersistence } from '../storage.js';
 import { EpubBook } from '../epub/parser.js';
+import { isPdfFile, openPdf } from '../pdf/pdf-book.js';
 import { installAvailable, promptInstall, pwaEvents } from '../pwa.js';
 import { ICONS, esc } from './dom.js';
 import { toast } from './toast.js';
@@ -26,25 +27,38 @@ async function makeThumbnail(blob) {
   }
 }
 
-/** Tambahkan file-file EPUB ke rak. Return jumlah buku yang berhasil ditambahkan. */
+const isEpubFile = (f) => /\.epub$/i.test(f.name) || f.type === 'application/epub+zip';
+
+/** Baca judul, penulis & sampul dari file EPUB atau PDF. */
+async function readBookInfo(file) {
+  if (isPdfFile(file)) {
+    const pdf = await openPdf(file, { fileName: file.name });
+    try {
+      return { format: 'pdf', title: pdf.title, author: pdf.author, fixedLayout: true, cover: await pdf.thumbnail().catch(() => null) };
+    } finally {
+      pdf.close();
+    }
+  }
+  const book = await EpubBook.open(file);
+  const cover = book.coverPath ? await makeThumbnail(await book.blob(book.coverPath)) : null;
+  book.close();
+  return { format: 'epub', title: book.title, author: book.author, fixedLayout: book.fixedLayout, cover };
+}
+
+/** Tambahkan file-file EPUB/PDF ke rak. Return jumlah buku yang berhasil ditambahkan. */
 export async function importFiles(files) {
-  const epubs = [...files].filter((f) => /\.epub$/i.test(f.name) || f.type === 'application/epub+zip');
-  if (!epubs.length) {
-    toast('Pilih file berformat .epub.');
+  const books = [...files].filter((f) => isEpubFile(f) || isPdfFile(f));
+  if (!books.length) {
+    toast('Pilih file berformat .epub atau .pdf.');
     return 0;
   }
   let added = 0;
-  for (const file of epubs) {
+  for (const file of books) {
     try {
-      const book = await EpubBook.open(file);
-      const cover = book.coverPath ? await makeThumbnail(await book.blob(book.coverPath)) : null;
-      book.close();
+      const info = await readBookInfo(file);
       await addBook({
         id: newId(),
-        title: book.title,
-        author: book.author,
-        fixedLayout: book.fixedLayout,
-        cover,
+        ...info,
         fileName: file.name,
         size: file.size,
         addedAt: Date.now(),
@@ -71,7 +85,7 @@ function coverColor(title) {
 }
 
 const fileInput = (extraClass = '') =>
-  `<input type="file" class="file-input ${extraClass}" accept=".epub,application/epub+zip" multiple hidden>`;
+  `<input type="file" class="file-input ${extraClass}" accept=".epub,application/epub+zip,.pdf,application/pdf" multiple hidden>`;
 
 export async function renderLibrary(app) {
   const coverUrls = [];
@@ -88,7 +102,7 @@ export async function renderLibrary(app) {
         <h1 class="lib-title">Rak buku</h1>
         <div id="shelf" aria-live="polite"></div>
       </main>
-      <div class="drop-overlay" id="drop-overlay" hidden><div>Lepaskan file EPUB di sini</div></div>
+      <div class="drop-overlay" id="drop-overlay" hidden><div>Lepaskan file EPUB atau PDF di sini</div></div>
     </div>`;
 
   const shelf = app.querySelector('#shelf');
@@ -129,8 +143,8 @@ export async function renderLibrary(app) {
       : `<div class="empty">
           <div class="empty-art">${ICONS.bookOpen}</div>
           <h2>Rak bukumu masih kosong</h2>
-          <p>Tambahkan file EPUB dari perangkat ini. Buku disimpan di browser dan tetap bisa dibaca tanpa internet.</p>
-          <label class="btn btn-primary">Pilih file EPUB${fileInput()}</label>
+          <p>Tambahkan file EPUB atau PDF dari perangkat ini. Buku disimpan di browser dan tetap bisa dibaca tanpa internet.</p>
+          <label class="btn btn-primary">Pilih file EPUB / PDF${fileInput()}</label>
           <p class="hint">atau seret file ke halaman ini</p>
         </div>`;
   }

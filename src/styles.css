@@ -174,17 +174,29 @@ button { font: inherit; color: inherit; }
   color-scheme: dark;
 }
 
+/* Menu atas & bawah melayang di atas panggung baca: menyembunyikannya (ketuk tengah layar)
+   tidak mengubah ukuran halaman, jadi buku tidak perlu disusun ulang. */
 .reader-bar {
-  display: flex; align-items: center; gap: 4px; flex: none;
+  position: absolute; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: center; gap: 4px;
   background: var(--chrome); border-color: var(--chrome-border);
   padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right));
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.08);
+  transition: transform 0.22s ease, opacity 0.22s ease;
 }
-.reader-top { padding-top: calc(4px + env(safe-area-inset-top)); padding-bottom: 4px; border-bottom: 1px solid var(--chrome-border); }
+.reader-top { top: 0; padding-top: calc(4px + env(safe-area-inset-top)); padding-bottom: 4px; border-bottom: 1px solid var(--chrome-border); }
 .reader-bottom {
+  bottom: 0;
   flex-direction: column; align-items: stretch; gap: 2px;
   padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--chrome-border);
 }
+.reader.ui-hidden .reader-top { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+.reader.ui-hidden .reader-bottom { transform: translateY(100%); opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .reader-bar { transition: none; } }
+
+.fullscreen-btn .icon-collapse, .fullscreen-btn.active .icon-expand { display: none; }
+.fullscreen-btn.active .icon-collapse { display: block; }
 .reader-titles { flex: 1; min-width: 0; text-align: center; line-height: 1.25; }
 .reader-book { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reader-chapter { font-size: 0.78rem; color: var(--chrome-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1em; }
@@ -196,7 +208,7 @@ button { font: inherit; color: inherit; }
 .stage {
   flex: 1; min-width: 0; position: relative;
   display: flex; align-items: center; justify-content: center;
-  margin: 14px 8px;
+  margin: calc(12px + env(safe-area-inset-top)) 8px calc(12px + env(safe-area-inset-bottom));
 }
 .nav-zone {
   flex: none; width: 56px; border: 0; background: transparent; cursor: pointer;
@@ -205,7 +217,7 @@ button { font: inherit; color: inherit; }
 .nav-zone:hover { opacity: 1; }
 @media (max-width: 760px), (hover: none) {
   .nav-zone { display: none; }
-  .stage { margin: 8px 6px; }
+  .stage { margin: calc(8px + env(safe-area-inset-top)) 6px calc(8px + env(safe-area-inset-bottom)); }
 }
 
 /* buku & halaman */
@@ -249,8 +261,8 @@ button { font: inherit; color: inherit; }
   overscroll-behavior: contain; overflow-anchor: none; -webkit-overflow-scrolling: touch;
   background: var(--paper); color: var(--page-text); outline: none;
 }
-.scroll-column { max-width: 720px; margin: 0 auto; padding: 32px 22px 40vh; }
-.scroll-column--fxl { max-width: 900px; padding: 0 0 30vh; }
+.scroll-column { max-width: 720px; margin: 0 auto; padding: calc(72px + env(safe-area-inset-top)) 22px 40vh; }
+.scroll-column--fxl { max-width: 900px; padding: calc(60px + env(safe-area-inset-top)) 0 30vh; }
 .scroll-chapter { display: block; }
 .scroll-column:not(.scroll-column--fxl) .scroll-chapter + .scroll-chapter {
   margin-top: 48px; padding-top: 40px; border-top: 1px solid var(--chrome-border);
@@ -389,6 +401,10 @@ button { font: inherit; color: inherit; }
 }
 .toast button { border: 0; background: transparent; color: #f0b98f; font-weight: 700; cursor: pointer; padding: 4px; white-space: nowrap; }
 body.reading .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+body.reading.reader-ui-hidden .toast { bottom: calc(20px + env(safe-area-inset-bottom)); }
+/* menu tersembunyi: pemutar musik turun ke tepi bawah */
+.music-player { transition: bottom 0.22s ease; }
+.reader.ui-hidden .music-player { bottom: calc(12px + env(safe-area-inset-bottom)); }
 
 @media (max-width: 480px) {
   .lib-actions .btn span { display: none; }

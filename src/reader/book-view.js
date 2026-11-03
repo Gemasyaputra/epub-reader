@@ -109,8 +109,9 @@ class Measurer {
 }
 
 export class BookView {
-  constructor({ stage, bookId, fixedLayout, chapters, settings, onChange }) {
+  constructor({ stage, bookId, fixedLayout, chapters, settings, onChange, onCenterTap }) {
     this.stage = stage;
+    this.onCenterTap = onCenterTap; // ketukan/klik di tengah halaman: tampil/sembunyikan menu
     this.bookId = bookId;
     this.fixedLayout = fixedLayout;
     this.chapters = chapters;
@@ -169,7 +170,10 @@ export class BookView {
     const animation = this.settings.pageAnimation || 'curl';
     if (animation === 'curl') this.createCurlFlip(el, L, start);
     else {
-      this.flip = new SimpleFlip(el, { pageW: L.pageW, pageH: L.pageH, landscape: L.landscape, startPage: start, mode: animation });
+      this.flip = new SimpleFlip(el, {
+        pageW: L.pageW, pageH: L.pageH, landscape: L.landscape, startPage: start, mode: animation,
+        onCenterTap: () => this.onCenterTap?.(),
+      });
       this.flip.loadFromHTML(this.pages);
     }
     this.flip.on('flip', (e) => {
@@ -203,7 +207,33 @@ export class BookView {
       useMouseEvents: true,
     });
     this.flip.loadFromHTML(this.pages);
-    this.detachTouch = attachTouch(this.stage, () => this.flip, L);
+    const onCenterTap = () => this.onCenterTap?.();
+    const detachTouch = attachTouch(this.stage, () => this.flip, L, { onCenterTap });
+
+    // Mouse: klik di tengah buku tidak membalik halaman, tapi menampilkan/menyembunyikan menu.
+    // mousedown dihentikan sebelum sampai ke StPageFlip; tepi kiri/kanan tetap membalik.
+    let press = null;
+    const onMouseDown = (e) => {
+      if (e.button !== 0) return;
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width;
+      if (x > 0.3 && x < 0.7 && e.clientY >= r.top && e.clientY <= r.bottom) {
+        e.stopPropagation();
+        press = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+      }
+    };
+    const onMouseUp = (e) => {
+      const p = press;
+      press = null;
+      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10 && e.timeStamp - p.t < 500) onCenterTap();
+    };
+    this.stage.addEventListener('mousedown', onMouseDown, true);
+    window.addEventListener('mouseup', onMouseUp, true);
+    this.detachTouch = () => {
+      detachTouch();
+      this.stage.removeEventListener('mousedown', onMouseDown, true);
+      window.removeEventListener('mouseup', onMouseUp, true);
+    };
   }
 
   async measure(L, onProgress) {
@@ -281,6 +311,13 @@ export class BookView {
     root.innerHTML = this.fixedLayout
       ? fixedMarkup(chapter, this.layout)
       : chapterMarkup(this.css, chapter, (i - this.starts[c]) * (this.layout.innerW + GAP));
+    if (chapter.renderInto) {
+      // halaman PDF: gambar ke canvas sesuai lebar tampil di halaman buku
+      const L = this.layout;
+      const vw = chapter.viewport?.w || 1000;
+      const vh = chapter.viewport?.h || 1414;
+      chapter.renderInto(root.querySelector('canvas.pdf-page'), vw * Math.min(L.pageW / vw, L.pageH / vh));
+    }
   }
 
   renderWindow(index) {
