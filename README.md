@@ -6,6 +6,8 @@ Aplikasi web untuk membaca buku EPUB dengan **animasi membalik halaman** (lipata
 
 - **Rak buku**: tambah file `.epub` (tombol atau seret file ke halaman), sampul otomatis, progres baca, hapus buku.
 - **Membaca**: halaman melengkung saat di-drag dari sudut, klik/tap sisi halaman, swipe, tombol panah keyboard, atau slider.
+  - **Mode baca**: **Buku** (default, halaman dibalik) atau **Gulir** (teks mengalir ke bawah, dibaca dengan scroll; buku komik/fixed-layout tampil bertumpuk seperti webtoon).
+  - **Animasi halaman** di mode buku: **Lipat kertas** (default), **Geser**, **Pudar**, atau **Tanpa** — tiga terakhir jauh lebih ringan untuk HP.
   - Tampilan halaman bisa dipilih: **Otomatis** (2 halaman di layar lebar/landscape, 1 halaman di HP portrait), **1 halaman**, atau **2 halaman**.
   - Daftar isi, judul bab di toolbar, nomor halaman.
   - Pengaturan: ukuran huruf, jenis huruf (bawaan buku/serif/sans), jarak baris, tema terang/sepia/gelap.

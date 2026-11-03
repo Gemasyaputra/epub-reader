@@ -215,6 +215,13 @@ button { font: inherit; color: inherit; }
 .book .stf__block { box-shadow: 0 10px 28px rgba(30, 20, 10, 0.28); }
 .reader[data-theme='dark'] .book .stf__block { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6); }
 
+/* animasi ringan (geser/pudar/tanpa): halaman dipotong di batas buku */
+.book.simple-book {
+  position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+  box-shadow: 0 10px 28px rgba(30, 20, 10, 0.28);
+}
+.reader[data-theme='dark'] .book.simple-book { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.6); }
+
 .page { background: var(--paper); color: var(--page-text); overflow: hidden; }
 .page-content {
   position: absolute; left: var(--pad-x); top: var(--pad-top);
@@ -233,6 +240,22 @@ button { font: inherit; color: inherit; }
 }
 .page--left::after { right: 0; background: linear-gradient(270deg, rgba(0, 0, 0, 0.16), transparent); }
 .page--right::after { left: 0; background: linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent); }
+
+/* mode gulir */
+.reader.flow-scroll .stage { margin: 0; display: block; }
+.reader.flow-scroll .nav-zone, .reader.flow-scroll .book-only { display: none; }
+.scroll-view {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; overflow-anchor: none; -webkit-overflow-scrolling: touch;
+  background: var(--paper); color: var(--page-text); outline: none;
+}
+.scroll-column { max-width: 720px; margin: 0 auto; padding: 32px 22px 40vh; }
+.scroll-column--fxl { max-width: 900px; padding: 0 0 30vh; }
+.scroll-chapter { display: block; }
+.scroll-column:not(.scroll-column--fxl) .scroll-chapter + .scroll-chapter {
+  margin-top: 48px; padding-top: 40px; border-top: 1px solid var(--chrome-border);
+}
+.scroll-column--fxl .scroll-chapter + .scroll-chapter { margin-top: 6px; }
 
 .loading {
   position: absolute; inset: 0; z-index: 4;

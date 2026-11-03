@@ -3,6 +3,7 @@ import { getBook, getBookFile, loadSettings, saveSettings, updateBook } from '..
 import { EpubBook } from '../epub/parser.js';
 import { loadChapter } from '../epub/content.js';
 import { BookView } from '../reader/book-view.js';
+import { ScrollView } from '../reader/scroll-view.js';
 import { ICONS, esc } from './dom.js';
 import { setupMusic } from './music-ui.js';
 import { toast } from './toast.js';
@@ -54,6 +55,8 @@ function template(meta, settings) {
 
     <section class="sheet" id="settings-panel" aria-label="Pengaturan tampilan" hidden>
       <div class="panel-head"><h2>Tampilan</h2><button type="button" class="icon-btn" data-close aria-label="Tutup">${ICONS.close}</button></div>
+      <div class="setting"><span>Mode baca</span>${segmented('flow', [['book', 'Buku'], ['scroll', 'Gulir']])}</div>
+      <div class="setting book-only"><span>Animasi halaman</span>${segmented('pageAnimation', [['curl', 'Lipat kertas'], ['slide', 'Geser'], ['fade', 'Pudar'], ['none', 'Tanpa']])}</div>
       <div class="setting text-only">
         <span>Ukuran huruf</span>
         <div class="stepper">
@@ -64,7 +67,7 @@ function template(meta, settings) {
       </div>
       <div class="setting text-only"><span>Jenis huruf</span>${segmented('font', [['book', 'Bawaan'], ['serif', 'Serif'], ['sans', 'Sans']])}</div>
       <div class="setting text-only"><span>Jarak baris</span>${segmented('lineHeight', [['1.4', 'Rapat'], ['1.6', 'Normal'], ['1.9', 'Lega']])}</div>
-      <div class="setting"><span>Tampilan halaman</span>${segmented('spread', [['auto', 'Otomatis'], ['single', '1 halaman'], ['double', '2 halaman']])}</div>
+      <div class="setting book-only"><span>Tampilan halaman</span>${segmented('spread', [['auto', 'Otomatis'], ['single', '1 halaman'], ['double', '2 halaman']])}</div>
       <div class="setting"><span>Tema</span>${segmented('theme', [['light', 'Terang'], ['sepia', 'Sepia'], ['dark', 'Gelap']])}</div>
     </section>
 
@@ -168,11 +171,18 @@ export async function openReader(app, id) {
   function onChange(state) {
     lastState = state;
     const { index, total, landscape, percent } = state;
-    slider.max = String(total);
-    slider.value = String(index + 1);
-    const last = landscape ? Math.min(index + 2, total) : index + 1;
-    const pages = last > index + 1 ? `${index + 1}–${last}` : `${index + 1}`;
-    $('#page-label').textContent = `Halaman ${pages} dari ${total} · ${Math.round(percent * 100)}%`;
+    if (state.mode === 'scroll') {
+      // mode gulir: slider = persen buku (judul bab sudah tampil di toolbar atas)
+      slider.max = '1000';
+      slider.value = String(Math.round(percent * 1000));
+      $('#page-label').textContent = `${Math.round(percent * 100)}% dibaca`;
+    } else {
+      slider.max = String(total);
+      slider.value = String(index + 1);
+      const last = landscape ? Math.min(index + 2, total) : index + 1;
+      const pages = last > index + 1 ? `${index + 1}–${last}` : `${index + 1}`;
+      $('#page-label').textContent = `Halaman ${pages} dari ${total} · ${Math.round(percent * 100)}%`;
+    }
     $('#chapter-title').textContent = chapterTitles[state.chapter] || '';
     for (const el of root.querySelectorAll('.toc-list button')) {
       el.classList.toggle('current', Number(el.dataset.chapter) === state.chapter);
@@ -181,13 +191,19 @@ export async function openReader(app, id) {
     saveTimer = setTimeout(() => savePosition(state), 400);
   }
 
-  view = new BookView({ stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange });
+  const isScroll = () => settings.flow === 'scroll';
+  const makeView = () => {
+    const View = isScroll() ? ScrollView : BookView;
+    return new View({ stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange });
+  };
+  root.classList.toggle('flow-scroll', isScroll());
+  view = makeView();
 
   let building = Promise.resolve();
-  const rebuild = (message) => {
+  const rebuild = (message, explicitPosition) => {
     building = building.then(async () => {
       if (disposed) return;
-      const position = view.anchor || meta.position;
+      const position = explicitPosition || view.anchor || meta.position;
       setLoading(message, 0.5);
       await view.build(position, (p) => setLoading(message, 0.5 + p * 0.5));
       loading.hidden = true;
@@ -234,12 +250,21 @@ export async function openReader(app, id) {
     settings[key] = value;
     saveSettings(settings);
     syncSettingsUI();
-    if (key === 'theme') {
+    if (key === 'flow') {
+      // ganti mode baca: posisi dibawa ke tampilan baru
+      const position = view.anchor || meta.position;
+      view.destroy();
+      root.classList.toggle('flow-scroll', isScroll());
+      view = makeView();
+      rebuild(isScroll() ? 'Beralih ke mode gulir…' : 'Beralih ke mode buku…', position);
+    } else if (key === 'theme') {
       root.dataset.theme = value;
       // warna teks tema gelap/sepia dipasang lewat CSS halaman: susun ulang tanpa mengukur lagi
       rebuild('Mengganti tema…');
+    } else if (key === 'pageAnimation') {
+      if (!isScroll()) rebuild('Mengganti animasi…');
     } else if (key === 'spread') {
-      rebuild('Mengatur tampilan halaman…'); // berlaku juga untuk buku fixed-layout
+      if (!isScroll()) rebuild('Mengatur tampilan halaman…'); // berlaku juga untuk buku fixed-layout
     } else if (LAYOUT_KEYS.includes(key) && !book.fixedLayout) {
       rebuild('Menyusun ulang halaman…');
     }
@@ -278,9 +303,14 @@ export async function openReader(app, id) {
   listen($('#prev-btn'), 'click', () => view.prev());
   listen($('#next-btn'), 'click', () => view.next());
   listen(slider, 'input', () => {
-    $('#page-label').textContent = `Ke halaman ${slider.value} dari ${slider.max}`;
+    $('#page-label').textContent = isScroll()
+      ? `Ke ${Math.round(Number(slider.value) / 10)}% buku`
+      : `Ke halaman ${slider.value} dari ${slider.max}`;
   });
-  listen(slider, 'change', () => view.goTo(Number(slider.value) - 1));
+  listen(slider, 'change', () => {
+    if (isScroll()) view.goToPercent(Number(slider.value) / 1000);
+    else view.goTo(Number(slider.value) - 1);
+  });
   listen(window, 'keydown', (e) => {
     if (e.target.closest?.('input, textarea')) return;
     if (e.key === 'Escape') closePanels();
@@ -302,8 +332,10 @@ export async function openReader(app, id) {
       size = { width, height };
       return;
     }
-    // abaikan perubahan kecil (mis. address bar HP muncul/hilang)
-    if (Math.abs(width - size.width) < 24 && Math.abs(height - size.height) < 90) return;
+    // abaikan perubahan kecil (mis. address bar HP muncul/hilang);
+    // mode gulir hanya perlu disusun ulang bila lebarnya berubah
+    const heightChanged = !isScroll() && Math.abs(height - size.height) >= 90;
+    if (Math.abs(width - size.width) < 24 && !heightChanged) return;
     size = { width, height };
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => rebuild('Menyesuaikan ukuran layar…'), 250);

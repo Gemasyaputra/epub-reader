@@ -76,8 +76,13 @@ export async function requestPersistence() {
 
 // Pengaturan tampilan baca: kecil & per perangkat, cukup di localStorage.
 const SETTINGS_KEY = 'lembar.settings';
+// flow: 'book' (balik halaman, default) | 'scroll' (gulir)
+// pageAnimation (mode buku): 'curl' (lipat kertas, default) | 'slide' | 'fade' | 'none'
 // spread: 'auto' (2 halaman bila layar lebar), 'single' (selalu 1), 'double' (selalu 2)
-export const DEFAULT_SETTINGS = { fontSize: 100, font: 'book', lineHeight: 1.6, theme: 'light', spread: 'auto' };
+export const DEFAULT_SETTINGS = {
+  fontSize: 100, font: 'book', lineHeight: 1.6, theme: 'light',
+  flow: 'book', pageAnimation: 'curl', spread: 'auto',
+};
 
 export function loadSettings() {
   try {

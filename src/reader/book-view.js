@@ -1,8 +1,10 @@
 // Tampilan buku: memecah bab menjadi halaman (CSS multi-column) lalu menampilkannya
-// dengan animasi lipatan kertas dari StPageFlip. Hanya halaman di sekitar posisi baca
-// yang diisi konten, agar buku ratusan halaman tetap ringan.
+// dengan animasi lipatan kertas (StPageFlip) atau animasi ringan (SimpleFlip: geser/pudar/tanpa).
+// Hanya halaman di sekitar posisi baca yang diisi konten, agar buku ratusan halaman tetap ringan.
 import { PageFlip } from 'page-flip';
 import { getLayout, saveLayout } from '../storage.js';
+import { baseCss, escapeAttr, handleChapterLinks, settle, textCss } from './chapter-css.js';
+import { SimpleFlip } from './simple-flip.js';
 import { attachTouch } from './touch.js';
 
 const GAP = 40; // jarak antar kolom (px), harus sama saat mengukur & menampilkan
@@ -17,11 +19,6 @@ const whenIdle = window.requestIdleCallback
   ? (fn) => window.requestIdleCallback(fn, { timeout: 1500 })
   : (fn) => setTimeout(() => fn(null), 150);
 const cancelIdle = window.cancelIdleCallback || clearTimeout;
-
-export const FONT_STACKS = {
-  serif: 'Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif',
-  sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-};
 
 /** Ukuran halaman & margin isi untuk area panggung tertentu. */
 export function computeLayout(stageW, stageH, fixedRatio, spread = 'auto') {
@@ -57,18 +54,8 @@ export function computeLayout(stageW, stageH, fixedRatio, spread = 'auto') {
   };
 }
 
-function baseCss(settings) {
-  // Default sebelum CSS buku (boleh ditimpa buku)
-  return `
-:host { display: block; }
-.epub-body { font-family: ${FONT_STACKS.serif}; }
-.epub-body img { max-width: 100%; }
-`;
-}
-
 function overrideCss(settings, L) {
-  // Setelah CSS buku: wajib untuk paginasi + pengaturan pembaca
-  const font = FONT_STACKS[settings.font];
+  // Setelah CSS buku: wajib untuk paginasi (kolom seukuran halaman) + pengaturan pembaca
   return `
 .viewport { position: relative; width: ${L.innerW}px; height: ${L.innerH}px; overflow: hidden; }
 .epub-body {
@@ -76,26 +63,8 @@ function overrideCss(settings, L) {
   width: ${L.innerW}px !important; height: ${L.innerH}px !important; max-width: none !important;
   column-width: ${L.innerW}px !important; column-gap: ${GAP}px !important;
   column-fill: auto !important; column-count: auto !important;
-  font-size: ${settings.fontSize}% !important; line-height: ${settings.lineHeight} !important;
-  color: var(--page-text); overflow-wrap: break-word; -webkit-hyphens: auto; hyphens: auto;
-  ${font ? `font-family: ${font} !important;` : ''}
 }
-.epub-body p, .epub-body li, .epub-body blockquote, .epub-body dd, .epub-body div, .epub-body span {
-  line-height: inherit !important; ${font ? 'font-family: inherit !important;' : ''}
-}
-.epub-body img, .epub-body svg, .epub-body video {
-  max-width: 100% !important; max-height: ${L.innerH}px !important;
-  height: auto; object-fit: contain; break-inside: avoid;
-}
-.epub-body figure { break-inside: avoid; margin-left: 0; margin-right: 0; }
-.epub-body h1, .epub-body h2, .epub-body h3, .epub-body h4 { break-after: avoid; break-inside: avoid; line-height: 1.25 !important; }
-.epub-body pre { white-space: pre-wrap; }
-.epub-body table { max-width: 100%; }
-.epub-body a { color: var(--page-link); }
-${settings.theme === 'light' ? '' : `
-.epub-body * { color: inherit !important; background-color: transparent !important; }
-.epub-body a { color: var(--page-link) !important; }`}
-`;
+${textCss(settings, `${L.innerH}px`)}`;
 }
 
 function chapterMarkup(css, chapter, shift = 0) {
@@ -116,20 +85,6 @@ function fixedMarkup(chapter, L) {
 .fxl-frame .epub-body { position: relative; margin: 0; width: ${vw}px; height: ${vh}px; }
 ${chapter.css}</style>`
     + `<div class="fxl-frame"><div class="epub-body ${escapeAttr(chapter.bodyClass)}">${chapter.html}</div></div>`;
-}
-
-function escapeAttr(value) {
-  return String(value).replace(/[&"<>]/g, (c) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[c]);
-}
-
-async function settle(root) {
-  const pending = [...root.querySelectorAll('img')].filter((img) => !img.complete);
-  const loaded = Promise.all(pending.map((img) => new Promise((resolve) => {
-    img.addEventListener('load', resolve, { once: true });
-    img.addEventListener('error', resolve, { once: true });
-  })));
-  await Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, 4000))]);
-  if (document.fonts?.ready) await document.fonts.ready;
 }
 
 /** Wadah tersembunyi untuk mengukur jumlah halaman tiap bab. */
@@ -176,7 +131,7 @@ export class BookView {
     const first = this.chapters[0].viewport;
     const ratio = this.fixedLayout ? (first ? first.w / first.h : 1 / Math.SQRT2) : null;
     const L = (this.layout = computeLayout(rect.width, rect.height, ratio, this.settings.spread));
-    this.css = { base: baseCss(this.settings), override: overrideCss(this.settings, L) };
+    this.css = { base: baseCss(), override: overrideCss(this.settings, L) };
 
     this.counts = this.fixedLayout ? this.chapters.map(() => 1) : await this.measure(L, onProgress);
     this.starts = [];
@@ -210,6 +165,26 @@ export class BookView {
     this.anchor = position || null;
     const start = this.indexFor(position);
     this.renderWindow(start);
+
+    const animation = this.settings.pageAnimation || 'curl';
+    if (animation === 'curl') this.createCurlFlip(el, L, start);
+    else {
+      this.flip = new SimpleFlip(el, { pageW: L.pageW, pageH: L.pageH, landscape: L.landscape, startPage: start, mode: animation });
+      this.flip.loadFromHTML(this.pages);
+    }
+    this.flip.on('flip', (e) => {
+      this.anchor = this.positionAt(e.data);
+      this.renderWindow(e.data);
+      this.onChange?.(this.state());
+    });
+    this.flip.on('changeState', (e) => {
+      if (e.data === 'user_fold' || e.data === 'flipping') this.renderWindow(this.flip.getCurrentPageIndex());
+    });
+    this.onChange?.(this.state());
+  }
+
+  /** Animasi lipatan kertas (StPageFlip) + gestur sentuh khusus HP. */
+  createCurlFlip(el, L, start) {
     this.flip = new PageFlip(el, {
       width: L.pageW,
       height: L.pageH,
@@ -229,15 +204,6 @@ export class BookView {
     });
     this.flip.loadFromHTML(this.pages);
     this.detachTouch = attachTouch(this.stage, () => this.flip, L);
-    this.flip.on('flip', (e) => {
-      this.anchor = this.positionAt(e.data);
-      this.renderWindow(e.data);
-      this.onChange?.(this.state());
-    });
-    this.flip.on('changeState', (e) => {
-      if (e.data === 'user_fold' || e.data === 'flipping') this.renderWindow(this.flip.getCurrentPageIndex());
-    });
-    this.onChange?.(this.state());
   }
 
   async measure(L, onProgress) {
@@ -286,10 +252,14 @@ export class BookView {
   state() {
     const index = this.flip ? this.flip.getCurrentPageIndex() : 0;
     const { chapter, frac } = this.positionAt(index);
+    // Tampilan 2 halaman: bila posisi baca ada di halaman kanan (mis. bab baru dimulai di kanan),
+    // judul bab mengikuti posisi baca, bukan halaman kiri.
+    const anchorIndex = this.anchor ? this.indexFor(this.anchor) : -1;
+    const shownChapter = this.layout.landscape && anchorIndex === index + 1 ? this.anchor.chapter : chapter;
     return {
       index,
       total: this.total,
-      chapter,
+      chapter: shownChapter,
       frac,
       anchor: this.anchor || { chapter, frac },
       percent: this.total > 1 ? index / (this.total - 1) : 1,
@@ -304,10 +274,7 @@ export class BookView {
     let root = host.shadowRoot;
     if (!root) {
       root = host.attachShadow({ mode: 'open' });
-      root.addEventListener('click', (e) => {
-        const link = e.composedPath().find((n) => n.dataset?.chapter);
-        if (link) this.goToPath(link.dataset.chapter); // tautan antar-bab di dalam buku
-      });
+      handleChapterLinks(root, (path) => this.goToPath(path));
     }
     const c = this.chapterAt(i);
     const chapter = this.chapters[c];
