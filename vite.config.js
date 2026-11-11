@@ -33,6 +33,16 @@ export default defineConfig({
       workbox: {
         // mjs = worker pdf.js (agar PDF tetap bisa dibuka saat offline)
         globPatterns: ['**/*.{js,mjs,css,html,svg,png,webmanifest}'],
+        // aset pdf.js (decoder wasm, font, cmap ±3 MB) tidak di-precache semua di awal:
+        // disimpan saat pertama dipakai, sesudahnya PDF tetap bisa dibuka offline
+        globIgnores: ['pdfjs/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/pdfjs/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'lembar-pdfjs', expiration: { maxEntries: 400 } },
+          },
+        ],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },

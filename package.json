@@ -5,7 +5,9 @@
   "description": "Lembar - pembaca EPUB dengan animasi membalik halaman (PWA)",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-pdfjs-assets.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },
