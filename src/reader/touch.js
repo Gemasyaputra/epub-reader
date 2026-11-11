@@ -92,6 +92,8 @@ export function attachTouch(stage, getFlip, layout, { onCenterTap } = {}) {
       y0: t.clientY,
       t0: e.timeStamp,
       rect: book.getBoundingClientRect(),
+      // skala tampilan buku (mengecil saat menu tampil): px layar -> px halaman
+      k: book.getBoundingClientRect().width / book.offsetWidth || 1,
       dir: null,
       folding: false,
       point: null,
@@ -118,11 +120,11 @@ export function attachTouch(stage, getFlip, layout, { onCenterTap } = {}) {
       const flip = getFlip();
       if (g.dir !== 'none' && !g.busy && flip && canFlip(flip, g.dir)) {
         g.folding = true;
-        flip.startUserTouch({ x: startX[g.dir], y: clampY(g.y0 - g.rect.top) });
+        flip.startUserTouch({ x: startX[g.dir], y: clampY((g.y0 - g.rect.top) / g.k) });
       }
     }
     if (g.folding) {
-      g.point = { x: startX[g.dir] + dx, y: clampY(t.clientY - g.rect.top) };
+      g.point = { x: startX[g.dir] + dx / g.k, y: clampY((t.clientY - g.rect.top) / g.k) };
       getFlip()?.userMove(g.point, true);
     }
   }
@@ -138,7 +140,7 @@ export function attachTouch(stage, getFlip, layout, { onCenterTap } = {}) {
     const t = e.changedTouches[0];
     const dx = t.clientX - g.x0;
     const dy = t.clientY - g.y0;
-    const y = t.clientY - g.rect.top;
+    const y = (t.clientY - g.rect.top) / g.k;
 
     if (!g.dir) {
       // tap: kiri 30% = mundur, kanan 30% = maju, tengah = tampil/sembunyikan menu
@@ -155,7 +157,7 @@ export function attachTouch(stage, getFlip, layout, { onCenterTap } = {}) {
     const first = g.samples[0];
     const vx = (t.clientX - first.x) / Math.max(1, e.timeStamp - first.t);
     const sign = g.dir === 'next' ? -1 : 1;
-    const commit = e.type === 'touchend' && (sign * dx > pw * COMMIT_RATIO || sign * vx > FLICK_SPEED);
+    const commit = e.type === 'touchend' && (sign * (dx / g.k) > pw * COMMIT_RATIO || sign * vx > FLICK_SPEED);
 
     if (g.folding && g.point) {
       settle(flip, g.point, { x: commit ? commitX[g.dir] : startX[g.dir], y: g.point.y });

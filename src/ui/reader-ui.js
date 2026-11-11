@@ -204,27 +204,48 @@ export async function openReader(app, id) {
 
   // ---- menu atas & bawah: ketuk tengah layar untuk menampilkan/menyembunyikan.
   // Menu melayang di atas panggung, jadi menyembunyikannya tidak mengubah ukuran halaman.
+  // Saat menu tampil, seluruh buku diperkecil (CSS scale) agar halaman utuh di antara menu atas
+  // & bawah; saat menu disembunyikan kembali penuh layar. Hanya transformasi visual: halaman
+  // tidak disusun ulang dan posisi baca tidak berubah.
+  const MENU_GAP = 10; // jarak halaman dari tepi menu (px)
+  const fitBook = () => {
+    const el = stage.querySelector('.book');
+    if (!el) return;
+    if (root.classList.contains('ui-hidden')) {
+      el.style.scale = '';
+      el.style.translate = '';
+      return;
+    }
+    const bandTop = $('.reader-top').offsetHeight + MENU_GAP;
+    const bandBottom = root.clientHeight - $('.reader-bottom').offsetHeight - MENU_GAP;
+    const stageRect = stage.getBoundingClientRect();
+    const top = stageRect.top + el.offsetTop; // posisi buku tanpa transformasi
+    const height = el.offsetHeight;
+    if (top >= bandTop && top + height <= bandBottom) {
+      el.style.scale = '';
+      el.style.translate = '';
+      return;
+    }
+    const scale = Math.min(1, (bandBottom - bandTop) / height);
+    const shift = (bandTop + bandBottom) / 2 - (top + height / 2);
+    el.style.scale = String(scale);
+    el.style.translate = `0 ${Math.round(shift)}px`;
+  };
   const setUiHidden = (hidden) => {
     root.classList.toggle('ui-hidden', hidden);
     document.body.classList.toggle('reader-ui-hidden', hidden);
+    fitBook();
   };
   const toggleUi = () => {
     if (!$('#scrim').hidden) return; // ada panel terbuka
     setUiHidden(!root.classList.contains('ui-hidden'));
   };
 
-  // Area layar di antara menu atas & bawah (dipakai halaman buku agar teks tidak tertutup menu).
-  // Memakai offsetHeight, jadi tetap benar walau menu sedang disembunyikan (transform).
-  const getMenuBand = () => ({
-    top: $('.reader-top').offsetHeight,
-    bottom: root.clientHeight - $('.reader-bottom').offsetHeight,
-  });
-
   const isScroll = () => settings.flow === 'scroll';
   const makeView = () => {
     const View = isScroll() ? ScrollView : BookView;
     return new View({
-      stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange, onCenterTap: toggleUi, getMenuBand,
+      stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange, onCenterTap: toggleUi,
     });
   };
   root.classList.toggle('flow-scroll', isScroll());
@@ -237,6 +258,7 @@ export async function openReader(app, id) {
       const position = explicitPosition || view.anchor || meta.position;
       setLoading(message, 0.5);
       await view.build(position, (p) => setLoading(message, 0.5 + p * 0.5));
+      fitBook();
       loading.hidden = true;
     }).catch((err) => {
       setLoading(`Gagal menyusun halaman: ${err.message}.`, 0);
@@ -374,6 +396,7 @@ export async function openReader(app, id) {
   });
   observer.observe(stage);
   disposers.push(() => observer.disconnect());
+  listen(window, 'resize', fitBook); // perubahan kecil tanpa susun ulang: sesuaikan skala saja
 
   // ---- layar penuh (browser biasa; PWA terpasang sudah fullscreen lewat manifest)
   const fullscreenBtn = $('#fullscreen-btn');

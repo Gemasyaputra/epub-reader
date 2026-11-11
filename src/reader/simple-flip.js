@@ -87,6 +87,7 @@ export class SimpleFlip {
   destroy() {
     this.stopAnimations();
     this.queued = null;
+    this.detachInput?.();
     this.el.remove();
   }
 
@@ -213,6 +214,9 @@ export class SimpleFlip {
 
   attachInput() {
     const el = this.el;
+    // Dengarkan seluruh panggung, bukan hanya buku: saat menu tampil buku diperkecil, dan
+    // ketukan di tepi layar (di luar buku) tetap harus membalik halaman.
+    const area = el.parentElement || el;
 
     const onDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -220,13 +224,14 @@ export class SimpleFlip {
       // membatalkan geseran halaman dengan mouse
       if (e.pointerType === 'mouse') e.preventDefault();
       try {
-        el.setPointerCapture(e.pointerId); // gerakan tetap terbaca walau jari keluar dari buku
+        area.setPointerCapture(e.pointerId); // gerakan tetap terbaca walau jari keluar dari buku
       } catch {
         /* pointer sudah tidak aktif */
       }
       this.gesture = {
         id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: e.timeStamp,
         rect: el.getBoundingClientRect(), dir: null, target: null, dragging: false, dx: 0,
+        k: el.getBoundingClientRect().width / el.offsetWidth || 1, // skala tampilan (menu tampil = mengecil)
         samples: [{ x: e.clientX, t: e.timeStamp }],
         busy: this.state !== 'read',
       };
@@ -258,7 +263,8 @@ export class SimpleFlip {
       if (g.dragging) {
         const w = this.width();
         // jari mengikuti arah awal; tidak bisa ditarik melewati titik awal
-        g.dx = g.dir === 1 ? Math.min(0, Math.max(-w, dx)) : Math.max(0, Math.min(w, dx));
+        const d = dx / g.k; // px layar -> px halaman
+        g.dx = g.dir === 1 ? Math.min(0, Math.max(-w, d)) : Math.max(0, Math.min(w, d));
         this.spread(this.current).forEach((p) => (p.style.transform = `translateX(${g.dx}px)`));
         this.spread(g.target).forEach((p) => (p.style.transform = `translateX(${g.dx + g.dir * w}px)`));
       }
@@ -286,7 +292,7 @@ export class SimpleFlip {
       const first = g.samples[0];
       const vx = (e.clientX - first.x) / Math.max(1, e.timeStamp - first.t);
       const commit = e.type === 'pointerup'
-        && (-g.dir * dx > this.pageW * COMMIT_RATIO || -g.dir * vx > FLICK_SPEED);
+        && (-g.dir * (dx / g.k) > this.pageW * COMMIT_RATIO || -g.dir * vx > FLICK_SPEED);
 
       if (g.dragging) {
         const progress = Math.abs(g.dx) / this.width();
@@ -297,10 +303,9 @@ export class SimpleFlip {
       }
     };
 
-    el.addEventListener('dragstart', (e) => e.preventDefault()); // gambar di halaman jangan ikut terseret
-    el.addEventListener('pointerdown', onDown);
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
-    el.addEventListener('pointercancel', onUp);
+    const onDragStart = (e) => e.preventDefault(); // gambar di halaman jangan ikut terseret
+    const listeners = [['dragstart', onDragStart], ['pointerdown', onDown], ['pointermove', onMove], ['pointerup', onUp], ['pointercancel', onUp]];
+    listeners.forEach(([type, fn]) => area.addEventListener(type, fn));
+    this.detachInput = () => listeners.forEach(([type, fn]) => area.removeEventListener(type, fn));
   }
 }

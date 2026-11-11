@@ -109,11 +109,9 @@ class Measurer {
 }
 
 export class BookView {
-  constructor({ stage, bookId, fixedLayout, chapters, settings, onChange, onCenterTap, getMenuBand }) {
+  constructor({ stage, bookId, fixedLayout, chapters, settings, onChange, onCenterTap }) {
     this.stage = stage;
     this.onCenterTap = onCenterTap; // ketukan/klik di tengah halaman: tampil/sembunyikan menu
-    // area layar yang tidak tertutup menu atas/bawah: () => ({ top, bottom }) dalam koordinat layar
-    this.getMenuBand = getMenuBand;
     this.bookId = bookId;
     this.fixedLayout = fixedLayout;
     this.chapters = chapters;
@@ -133,7 +131,7 @@ export class BookView {
     const rect = this.stage.getBoundingClientRect();
     const first = this.chapters[0].viewport;
     const ratio = this.fixedLayout ? (first ? first.w / first.h : 1 / Math.SQRT2) : null;
-    const L = (this.layout = this.fitToChrome(computeLayout(rect.width, rect.height, ratio, this.settings.spread), rect, ratio));
+    const L = (this.layout = computeLayout(rect.width, rect.height, ratio, this.settings.spread));
     this.css = { base: baseCss(), override: overrideCss(this.settings, L) };
 
     this.counts = this.fixedLayout ? this.chapters.map(() => 1) : await this.measure(L, onProgress);
@@ -153,7 +151,6 @@ export class BookView {
     el.style.setProperty('--pad-top', `${L.padTop}px`);
     el.style.setProperty('--inner-w', `${L.innerW}px`);
     el.style.setProperty('--inner-h', `${L.innerH}px`);
-    if (L.shiftY) el.style.translate = `0 ${L.shiftY}px`; // fixed-layout: tengahkan di antara menu
     this.stage.append(el);
     this.el = el;
 
@@ -210,6 +207,15 @@ export class BookView {
       useMouseEvents: true,
     });
     this.flip.loadFromHTML(this.pages);
+    // Buku bisa diperkecil (CSS scale) saat menu tampil. StPageFlip menghitung posisi mouse
+    // dari getBoundingClientRect (px layar), jadi dikonversi kembali ke px halaman.
+    const ui = this.flip.getUI();
+    const screenToBook = ui.getMousePos.bind(ui);
+    ui.getMousePos = (x, y) => {
+      const pos = screenToBook(x, y);
+      const k = el.getBoundingClientRect().width / el.offsetWidth || 1;
+      return { x: pos.x / k, y: pos.y / k };
+    };
     const onCenterTap = () => this.onCenterTap?.();
     const detachTouch = attachTouch(this.stage, () => this.flip, L, { onCenterTap });
 
@@ -237,30 +243,6 @@ export class BookView {
       this.stage.removeEventListener('mousedown', onMouseDown, true);
       window.removeEventListener('mouseup', onMouseUp, true);
     };
-  }
-
-  /**
-   * Menu atas & bawah melayang di atas halaman. Agar teks tidak tertutup saat menu tampil:
-   * - buku teks: kertas tetap setinggi layar, margin atas/bawah diperbesar seukuran menu;
-   * - fixed-layout/PDF (tanpa margin): halaman diperkecil agar pas di antara kedua menu.
-   */
-  fitToChrome(L, rect, ratio) {
-    const band = this.getMenuBand?.();
-    if (!band) return L;
-    const GAP = 12; // jarak teks dari tepi menu
-    if (this.fixedLayout) {
-      const freeH = Math.min(rect.height, band.bottom - band.top - GAP * 2);
-      if (freeH >= rect.height - 1) return L;
-      const fitted = computeLayout(rect.width, freeH, ratio, this.settings.spread);
-      fitted.shiftY = Math.round((band.top + band.bottom) / 2 - (rect.top + rect.height / 2));
-      return fitted;
-    }
-    const pageTop = rect.top + (rect.height - L.pageH) / 2;
-    const overlapTop = Math.max(0, band.top - pageTop);
-    const overlapBottom = Math.max(0, pageTop + L.pageH - band.bottom);
-    const padTop = Math.max(L.padTop, Math.round(overlapTop + GAP));
-    const padBottom = Math.max(L.padBottom, Math.round(overlapBottom + GAP));
-    return { ...L, padTop, padBottom, innerH: L.pageH - padTop - padBottom };
   }
 
   async measure(L, onProgress) {
