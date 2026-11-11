@@ -202,47 +202,13 @@ export class BookView {
       flippingTime: 600,
       mobileScrollSupport: false,
       swipeDistance: 20,
-      showPageCorners: true,
-      clickEventForward: true,
-      useMouseEvents: true,
+      // Semua seret/klik/ketuk (jari & mouse) ditangani touch.js — termasuk tarik dari tengah
+      // tepi halaman — jadi penanganan bawaan StPageFlip dimatikan agar tidak saling berebut.
+      showPageCorners: false,
+      useMouseEvents: false,
     });
     this.flip.loadFromHTML(this.pages);
-    // Buku bisa diperkecil (CSS scale) saat menu tampil. StPageFlip menghitung posisi mouse
-    // dari getBoundingClientRect (px layar), jadi dikonversi kembali ke px halaman.
-    const ui = this.flip.getUI();
-    const screenToBook = ui.getMousePos.bind(ui);
-    ui.getMousePos = (x, y) => {
-      const pos = screenToBook(x, y);
-      const k = el.getBoundingClientRect().width / el.offsetWidth || 1;
-      return { x: pos.x / k, y: pos.y / k };
-    };
-    const onCenterTap = () => this.onCenterTap?.();
-    const detachTouch = attachTouch(this.stage, () => this.flip, L, { onCenterTap });
-
-    // Mouse: klik di tengah buku tidak membalik halaman, tapi menampilkan/menyembunyikan menu.
-    // mousedown dihentikan sebelum sampai ke StPageFlip; tepi kiri/kanan tetap membalik.
-    let press = null;
-    const onMouseDown = (e) => {
-      if (e.button !== 0) return;
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      if (x > 0.3 && x < 0.7 && e.clientY >= r.top && e.clientY <= r.bottom) {
-        e.stopPropagation();
-        press = { x: e.clientX, y: e.clientY, t: e.timeStamp };
-      }
-    };
-    const onMouseUp = (e) => {
-      const p = press;
-      press = null;
-      if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 10 && e.timeStamp - p.t < 500) onCenterTap();
-    };
-    this.stage.addEventListener('mousedown', onMouseDown, true);
-    window.addEventListener('mouseup', onMouseUp, true);
-    this.detachTouch = () => {
-      detachTouch();
-      this.stage.removeEventListener('mousedown', onMouseDown, true);
-      window.removeEventListener('mouseup', onMouseUp, true);
-    };
+    this.detachTouch = attachTouch(this.stage, () => this.flip, L, { onCenterTap: () => this.onCenterTap?.() });
   }
 
   async measure(L, onProgress) {
