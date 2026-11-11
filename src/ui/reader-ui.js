@@ -213,11 +213,18 @@ export async function openReader(app, id) {
     setUiHidden(!root.classList.contains('ui-hidden'));
   };
 
+  // Area layar di antara menu atas & bawah (dipakai halaman buku agar teks tidak tertutup menu).
+  // Memakai offsetHeight, jadi tetap benar walau menu sedang disembunyikan (transform).
+  const getMenuBand = () => ({
+    top: $('.reader-top').offsetHeight,
+    bottom: root.clientHeight - $('.reader-bottom').offsetHeight,
+  });
+
   const isScroll = () => settings.flow === 'scroll';
   const makeView = () => {
     const View = isScroll() ? ScrollView : BookView;
     return new View({
-      stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange, onCenterTap: toggleUi,
+      stage, bookId: id, fixedLayout: book.fixedLayout, chapters, settings, onChange, onCenterTap: toggleUi, getMenuBand,
     });
   };
   root.classList.toggle('flow-scroll', isScroll());
